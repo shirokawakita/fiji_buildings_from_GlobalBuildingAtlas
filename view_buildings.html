@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiji建物ポリゴン地図ビューア</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 1.5rem;
+            overflow-y: auto;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .file-drop-area {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            background: white;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-drop-area:hover {
+            background: #f0f0ff;
+            border-color: #764ba2;
+        }
+
+        .file-drop-area.dragover {
+            background: #e8e8ff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+
+        .file-drop-area input[type="file"] {
+            display: none;
+        }
+
+        .file-drop-area label {
+            cursor: pointer;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .file-info {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .file-info strong {
+            color: #667eea;
+        }
+
+        .controls {
+            margin-top: 1.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-group input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .control-group .value-display {
+            font-size: 0.85rem;
+            color: #666;
+            text-align: right;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        #map {
+            flex: 1;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .status-message {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .status-message.success {
+            border-left: 4px solid #28a745;
+        }
+
+        .status-message.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .legend {
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 1rem;
+        }
+
+        .legend h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ddd;
+            margin-right: 0.5rem;
+            border-radius: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 300px;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏛️ Fiji建物ポリゴン地図ビューア</h1>
+        <p>GeoJSONファイルをドラッグ&ドロップまたはクリックして選択してください</p>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="file-drop-area" id="dropArea">
+                <input type="file" id="fileInput" accept=".geojson,.json">
+                <label for="fileInput">
+                    📁 GeoJSONファイルを<br>
+                    ドラッグ&ドロップまたは<br>
+                    クリックして選択
+                </label>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <strong>読み込み済み:</strong> <span id="fileName"></span><br>
+                    <strong>建物数:</strong> <span id="buildingCount">0</span>件
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>線の色:</label>
+                    <input type="color" id="strokeColor" value="#667eea">
+                </div>
+
+                <div class="control-group">
+                    <label>塗りつぶしの色:</label>
+                    <input type="color" id="fillColor" value="#ffd700">
+                </div>
+
+                <div class="control-group">
+                    <label>線の透明度:</label>
+                    <input type="range" id="strokeOpacity" min="0" max="1" step="0.1" value="0.8">
+                    <div class="value-display" id="strokeOpacityValue">80%</div>
+                </div>
+
+                <div class="control-group">
+                    <label>塗りつぶしの透明度:</label>
+                    <input type="range" id="fillOpacity" min="0" max="1" step="0.1" value="0.3">
+                    <div class="value-display" id="fillOpacityValue">30%</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="zoomToBuildings()">🏠 建物範囲にズーム</button>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-secondary" onclick="zoomToFiji()">🗺️ Fiji全体にズーム</button>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-danger" onclick="clearMap()">🗑️ クリア</button>
+                </div>
+            </div>
+
+            <div class="legend">
+                <h3>凡例</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffd700; opacity: 0.3;"></div>
+                    <span>建物ポリゴン</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div id="map"></div>
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 地図の初期化
+        const map = L.map('map').setView([-17.8, 178.4], 10);
+
+        // OpenStreetMapタイルレイヤーの追加
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        // GeoJSONレイヤーを保持する変数
+        let geoJsonLayer = null;
+
+        // ファイルドロップエリアの設定
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const buildingCount = document.getElementById('buildingCount');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // ドラッグ&ドロップイベント
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        dropArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // GeoJSONデータからバウンディングボックスを計算
+        function calculateBounds(geoJsonData) {
+            if (!geoJsonData.features || geoJsonData.features.length === 0) {
+                return null;
+            }
+
+            let minLat = Infinity;
+            let maxLat = -Infinity;
+            let minLng = Infinity;
+            let maxLng = -Infinity;
+
+            const processCoordinates = (coords) => {
+                if (!Array.isArray(coords)) {
+                    return;
+                }
+                
+                // 座標が数値の配列かチェック [lng, lat]
+                if (coords.length >= 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+                    const [lng, lat] = coords;
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        minLat = Math.min(minLat, lat);
+                        maxLat = Math.max(maxLat, lat);
+                        minLng = Math.min(minLng, lng);
+                        maxLng = Math.max(maxLng, lng);
+                    }
+                    return;
+                }
+                
+                // 配列の配列の場合は再帰的に処理
+                if (Array.isArray(coords[0])) {
+                    coords.forEach(coord => processCoordinates(coord));
+                }
+            };
+
+            geoJsonData.features.forEach(feature => {
+                if (!feature.geometry || !feature.geometry.coordinates) {
+                    return;
+                }
+
+                const geomType = feature.geometry.type;
+                const coords = feature.geometry.coordinates;
+
+                if (geomType === 'Point') {
+                    processCoordinates(coords);
+                } else if (geomType === 'Polygon') {
+                    // Polygon: coordinates[0] が外側のリング
+                    if (coords[0] && Array.isArray(coords[0])) {
+                        coords[0].forEach(coord => processCoordinates(coord));
+                    }
+                } else if (geomType === 'MultiPolygon') {
+                    // MultiPolygon: coordinates[0][0] が最初のポリゴンの外側のリング
+                    coords.forEach(polygon => {
+                        if (polygon[0] && Array.isArray(polygon[0])) {
+                            polygon[0].forEach(coord => processCoordinates(coord));
+                        }
+                    });
+                } else {
+                    // その他のタイプは再帰的に処理
+                    processCoordinates(coords);
+                }
+            });
+
+            if (minLat === Infinity || maxLat === -Infinity || minLng === Infinity || maxLng === -Infinity) {
+                return null;
+            }
+
+            // バウンディングボックスが有効か確認
+            if (minLat >= maxLat || minLng >= maxLng) {
+                return null;
+            }
+
+            // 日付変更線を跨ぐ場合の処理（経度が180度を跨いでいる場合）
+            // 例: -179.97° ～ 179.99° のような場合
+            if (maxLng - minLng > 180) {
+                // 日付変更線を跨いでいる場合、2つのバウンディングボックスに分割
+                // または、中心座標とサイズから直接計算
+                const centerLng = (minLng + maxLng) / 2;
+                // 中心が180度を跨いでいる場合、正規化
+                let normalizedCenterLng = centerLng;
+                if (centerLng > 180) normalizedCenterLng -= 360;
+                if (centerLng < -180) normalizedCenterLng += 360;
+                
+                // 実際の範囲を計算（日付変更線を跨ぐ部分を考慮）
+                const lngRange1 = 180 - minLng; // 西側の範囲
+                const lngRange2 = maxLng - (-180); // 東側の範囲
+                const actualLngRange = Math.max(lngRange1, lngRange2);
+                
+                // 中心座標を使用してバウンディングボックスを作成
+                const centerLat = (minLat + maxLat) / 2;
+                const latRange = maxLat - minLat;
+                
+                // 中心を基準にバウンディングボックスを作成
+                return L.latLngBounds(
+                    [centerLat - latRange / 2, normalizedCenterLng - actualLngRange / 2],
+                    [centerLat + latRange / 2, normalizedCenterLng + actualLngRange / 2]
+                );
+            }
+
+            return L.latLngBounds(
+                [minLat, minLng],
+                [maxLat, maxLng]
+            );
+        }
+
+        // ファイル処理関数
+        function handleFile(file) {
+            if (!file.name.toLowerCase().endsWith('.geojson') && !file.name.toLowerCase().endsWith('.json')) {
+                showStatus('GeoJSONファイルを選択してください', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const geoJsonData = JSON.parse(e.target.result);
+                    
+                    // 既存のレイヤーを削除
+                    if (geoJsonLayer) {
+                        map.removeLayer(geoJsonLayer);
+                    }
+
+                    // GeoJSONデータからバウンディングボックスを計算
+                    const calculatedBounds = calculateBounds(geoJsonData);
+                    
+                    // ファイル情報を更新
+                    fileName.textContent = file.name;
+                    const featureCount = geoJsonData.features ? geoJsonData.features.length : 0;
+                    buildingCount.textContent = featureCount.toLocaleString();
+                    fileInfo.style.display = 'block';
+
+                    // GeoJSONレイヤーを作成
+                    geoJsonLayer = L.geoJSON(geoJsonData, {
+                        style: getStyle,
+                        onEachFeature: onEachFeature
+                    });
+
+                    // レイヤーを地図に追加
+                    geoJsonLayer.addTo(map);
+
+                    // ズーム処理を実行（Fijiの中心座標を使用）
+                    const performZoom = () => {
+                        let boundsToUse = null;
+                        
+                        // 方法1: 計算したバウンディングボックスを使用
+                        if (calculatedBounds && calculatedBounds.isValid()) {
+                            boundsToUse = calculatedBounds;
+                        } 
+                        // 方法2: レイヤーから取得
+                        else {
+                            try {
+                                const layerBounds = geoJsonLayer.getBounds();
+                                if (layerBounds && layerBounds.isValid()) {
+                                    boundsToUse = layerBounds;
+                                }
+                            } catch (e) {
+                                // エラーは無視
+                            }
+                        }
+
+                        // Fijiの中心座標（Suva周辺）を直接使用
+                        const fijiCenter = L.latLng(-17.8, 178.4);
+                        let calculatedZoom = 9;
+                        
+                        if (boundsToUse && boundsToUse.isValid()) {
+                            const sw = boundsToUse.getSouthWest();
+                            const ne = boundsToUse.getNorthEast();
+                            
+                            // 緯度範囲から適切なズームレベルを計算
+                            const latRange = ne.lat - sw.lat;
+                            if (latRange > 3) calculatedZoom = 7;
+                            else if (latRange > 2) calculatedZoom = 8;
+                            else if (latRange > 1) calculatedZoom = 9;
+                            else if (latRange > 0.5) calculatedZoom = 10;
+                            else if (latRange > 0.2) calculatedZoom = 11;
+                            else calculatedZoom = 12;
+                        }
+                        
+                        // 直接ズーム
+                        map.setView(fijiCenter, calculatedZoom, { animate: false });
+                        
+                        showStatus(`${featureCount.toLocaleString()}件の建物を読み込みました`, 'success');
+                    };
+
+                    // レイヤーが完全に追加・レンダリングされるのを待つ
+                    setTimeout(() => {
+                        performZoom();
+                    }, 300);
+                } catch (error) {
+                    showStatus('GeoJSONファイルの読み込みに失敗しました: ' + error.message, 'error');
+                    console.error(error);
+                }
+            };
+
+            reader.onerror = () => {
+                showStatus('ファイルの読み込みに失敗しました', 'error');
+            };
+
+            reader.readAsText(file);
+        }
+
+        // スタイル関数
+        function getStyle(feature) {
+            const strokeColor = document.getElementById('strokeColor').value;
+            const fillColor = document.getElementById('fillColor').value;
+            const strokeOpacity = parseFloat(document.getElementById('strokeOpacity').value);
+            const fillOpacity = parseFloat(document.getElementById('fillOpacity').value);
+
+            return {
+                color: strokeColor,
+                weight: 1,
+                opacity: strokeOpacity,
+                fillColor: fillColor,
+                fillOpacity: fillOpacity
+            };
+        }
+
+        // 各フィーチャーに対する処理
+        function onEachFeature(feature, layer) {
+            // クリック時にポップアップを表示
+            if (feature.properties) {
+                let popupContent = '<div style="font-size: 0.9rem;">';
+                
+                if (feature.properties.id) {
+                    popupContent += `<strong>ID:</strong> ${feature.properties.id}<br>`;
+                }
+                
+                if (feature.properties.scores) {
+                    popupContent += `<strong>スコア:</strong> ${feature.properties.scores}<br>`;
+                }
+
+                // その他のプロパティを表示
+                for (const key in feature.properties) {
+                    if (key !== 'id' && key !== 'scores') {
+                        popupContent += `<strong>${key}:</strong> ${feature.properties[key]}<br>`;
+                    }
+                }
+
+                popupContent += '</div>';
+                layer.bindPopup(popupContent);
+            }
+
+            // マウスオーバー時のスタイル変更
+            layer.on({
+                mouseover: function(e) {
+                    const layer = e.target;
+                    layer.setStyle({
+                        weight: 2,
+                        fillOpacity: 0.5
+                    });
+                },
+                mouseout: function(e) {
+                    geoJsonLayer.resetStyle(e.target);
+                }
+            });
+        }
+
+        // スタイル更新関数
+        function updateStyle() {
+            if (geoJsonLayer) {
+                geoJsonLayer.setStyle(getStyle);
+            }
+        }
+
+        // イベントリスナーの追加
+        document.getElementById('strokeColor').addEventListener('change', updateStyle);
+        document.getElementById('fillColor').addEventListener('change', updateStyle);
+        document.getElementById('strokeOpacity').addEventListener('input', (e) => {
+            document.getElementById('strokeOpacityValue').textContent = Math.round(e.target.value * 100) + '%';
+            updateStyle();
+        });
+        document.getElementById('fillOpacity').addEventListener('input', (e) => {
+            document.getElementById('fillOpacityValue').textContent = Math.round(e.target.value * 100) + '%';
+            updateStyle();
+        });
+
+        // ズーム関数
+        function zoomToBuildings() {
+            if (!geoJsonLayer) {
+                showStatus('建物データが読み込まれていません', 'error');
+                return;
+            }
+
+            try {
+                // レイヤーが地図に追加されているか確認
+                if (!map.hasLayer(geoJsonLayer)) {
+                    showStatus('建物レイヤーが地図に追加されていません', 'error');
+                    return;
+                }
+
+                // バウンディングボックスを取得
+                const bounds = geoJsonLayer.getBounds();
+                
+                // バウンディングボックスが有効か確認
+                if (!bounds || !bounds.isValid()) {
+                    showStatus('建物の範囲を取得できませんでした', 'error');
+                    return;
+                }
+
+                // バウンディングボックスのサイズを確認
+                const latDiff = bounds.getNorth() - bounds.getSouth();
+                const lngDiff = bounds.getEast() - bounds.getWest();
+                
+                if (latDiff === 0 && lngDiff === 0) {
+                    showStatus('建物が1点に集中しています', 'error');
+                    return;
+                }
+
+                // 日付変更線を跨ぐ場合の検出
+                const isCrossingDateline = lngDiff > 180 || (bounds.getWest() < 0 && bounds.getEast() > 0);
+                
+                if (isCrossingDateline) {
+                    // Fijiの中心座標を使用
+                    const fijiCenter = L.latLng(-17.8, 178.4);
+                    
+                    // 緯度範囲から適切なズームレベルを計算
+                    let calculatedZoom = 9;
+                    if (latDiff > 3) calculatedZoom = 7;
+                    else if (latDiff > 2) calculatedZoom = 8;
+                    else if (latDiff > 1) calculatedZoom = 9;
+                    else if (latDiff > 0.5) calculatedZoom = 10;
+                    else if (latDiff > 0.2) calculatedZoom = 11;
+                    else calculatedZoom = 12;
+                    
+                    // 直接ズーム
+                    map.setView(fijiCenter, calculatedZoom, { animate: true });
+                    
+                    showStatus('建物範囲にズームしました', 'success');
+                } else {
+                    // 通常の処理
+                    // 地図の範囲にズーム
+                    map.fitBounds(bounds, {
+                        padding: [50, 50],
+                        maxZoom: 15,
+                        animate: true,
+                        duration: 0.5
+                    });
+                    
+                    showStatus('建物範囲にズームしました', 'success');
+                }
+            } catch (error) {
+                console.error('ズームエラー:', error);
+                showStatus('ズームに失敗しました: ' + error.message, 'error');
+            }
+        }
+
+        function zoomToFiji() {
+            map.setView([-17.8, 178.4], 7);
+            showStatus('Fiji全体にズームしました', 'success');
+        }
+
+        function clearMap() {
+            if (geoJsonLayer) {
+                map.removeLayer(geoJsonLayer);
+                geoJsonLayer = null;
+                fileInfo.style.display = 'none';
+                fileName.textContent = '';
+                buildingCount.textContent = '0';
+                showStatus('地図をクリアしました', 'success');
+            }
+        }
+
+        // ステータスメッセージ表示関数
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message ${type} show`;
+            
+            setTimeout(() => {
+                statusMessage.classList.remove('show');
+            }, 3000);
+        }
+
+        // 初期メッセージ
+        showStatus('GeoJSONファイルを選択してください', 'success');
+    </script>
+</body>
+</html>
+
