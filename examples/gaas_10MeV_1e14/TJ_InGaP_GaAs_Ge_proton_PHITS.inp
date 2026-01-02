@@ -1,0 +1,112 @@
+
+[parameters]
+maxcas = 200000                 $ histories (increase for statistics)
+negs   = 2                      $ enable EGS5 EM processes (PHITS 3.33+)
+$OMP   = 8
+
+# ---------------------------------------------------------------
+# Materials (Bragg rule mixtures for compounds)
+# ---------------------------------------------------------------
+[material]
+mat[1] SiO2 1                   $ cover glass (fused silica)
+mat[2] InGaP 3                  $ In0.49Ga0.51P (approx.)
+  Z=49  sto=0.49                $ In
+  Z=31  sto=0.51                $ Ga
+  Z=15  sto=1.00                $ P
+mat[3] GaAs 2                   $ GaAs junction
+  Z=31  sto=1.0                 $ Ga
+  Z=33  sto=1.0                 $ As
+mat[4] Ge   1                   $ Ge substrate (bottom cell)
+mat[5] Al   1                   $ back metallization (optional)
+
+[density]
+rho[1] = 2.20                   $ g/cm3 SiO2
+rho[2] = 5.60                   $ g/cm3 InGaP (approx.; adjust to vendor data)
+rho[3] = 5.32                   $ g/cm3 GaAs
+rho[4] = 5.32                   $ g/cm3 Ge
+rho[5] = 2.70                   $ g/cm3 Al
+
+# ---------------------------------------------------------------
+# Displacement threshold energies (Ed)
+# Values aligned with SR-NIEL recommendations / TJ literature
+# ---------------------------------------------------------------
+[edisp]
+Ed_In = 43 eV
+Ed_Ga = 21.5 eV
+Ed_P  = 21.0 eV
+Ed_As = 21.5 eV
+Ed_Ge = 40.5 eV
+Ed_Si = 21.0 eV
+Ed_O  = 28.0 eV
+Ed_Al = 25.0 eV
+
+# ---------------------------------------------------------------
+# Geometry: z-stacked layers
+# default thicknesses (adjust to your device)
+# Cover glass: 100 µm; InGaP: 0.6 µm; GaAs: 3.0 µm; Ge: 150 µm; Al: 50 µm
+# ---------------------------------------------------------------
+[surface]
+10  pz  0.0
+11  pz  0.010                 $ +0.010 cm (100 µm) cover glass
+12  pz  0.0106                $ +0.0006 cm InGaP top cell
+13  pz  0.0136                $ +0.0030 cm GaAs mid cell
+14  pz  0.1636                $ +0.1500 cm Ge bottom substrate
+15  pz  0.1686                $ +0.0050 cm Al back metal (optional)
+90  px  -0.5
+91  px   0.5
+92  py  -0.5
+93  py   0.5
+99  so  100.0
+
+[cell]
+101  1  -rho[1]  -90 91 -92 93 -10 11       $ SiO2 cover
+102  2  -rho[2]  -90 91 -92 93  11 12       $ InGaP top
+103  3  -rho[3]  -90 91 -92 93  12 13       $ GaAs middle
+104  4  -rho[4]  -90 91 -92 93  13 14       $ Ge bottom/substrate
+105  5  -rho[5]  -90 91 -92 93  14 15       $ Al back metal (optional)
+998  0   0        -99 #101 #102 #103 #104 #105
+
+# ---------------------------------------------------------------
+# Source: mono-energetic protons (modify energy and angular spread as needed)
+# ---------------------------------------------------------------
+[source]
+s-type = 1
+proj   = proton
+e0     = 10.0                   $ 10 MeV reference (set to test energy)
+x0 = 0.0; y0 = 0.0; z0 = -0.1
+vx = 0.0; vy = 0.0; vz = 1.0
+
+# Optional: small beam divergence / spot size can be set via source cards or external filters
+
+# ---------------------------------------------------------------
+# Tally: flux (z-profile), DPA/ARC-DPA, DDD per layer
+# ---------------------------------------------------------------
+[t-track]
+file   = flux_proton.out
+part   = proton
+mesh   = xyz
+x-type = 2; xmin=-0.1; xmax=0.1; nx=1
+y-type = 2; ymin=-0.1; ymax=0.1; ny=1
+z-type = 2; zmin=0.0;  zmax=0.1686; nz=400
+unit   = 1                     $ FLUX [1/cm^2/source]
+
+[t-dpa]
+file     = dpa_layers_nrt.out
+model    = NRT
+norm     = per_source
+targets  = 101 102 103 104 105
+
+[t-dpa]
+file     = dpa_layers_arc.out
+model    = ARC
+norm     = per_source
+targets  = 101 102 103 104 105
+
+[t-ddd]
+file     = ddd_layers.out
+unit     = MeV/g_per_source
+targets  = 101 102 103 104 105
+
+[output]
+cshow = 2
+epsout = 0
